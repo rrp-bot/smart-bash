@@ -1,5 +1,5 @@
-import type { SmartBashConfig } from "./config.ts"
-import type { ExecutionRecord } from "./store.ts"
+import type { SmartBashConfig } from "./config.js"
+import type { ExecutionRecord } from "./store.js"
 
 // Minimal types for the parts of the OpenCode client we use, so callers don't
 // need to import the full SDK in tests and we keep the surface narrow.
@@ -12,12 +12,8 @@ export interface AnalystClient {
         noReply?: boolean
         parts: Array<{ type: "text"; text: string }>
         model?: { providerID: string; modelID: string }
-        format?: {
-          type: "json_schema"
-          schema: Record<string, unknown>
-        }
       }
-    }): Promise<{ data: { info: { structured_output?: { answer?: string } } } }>
+    }): Promise<{ data: { parts: Array<{ type: string; text?: string }> } }>
     delete(opts: { path: { id: string } }): Promise<unknown>
   }
 }
@@ -56,7 +52,7 @@ export function buildContextBlock(record: ExecutionRecord): string {
 }
 
 /**
- * Parse a model string like "anthropic/claude-haiku-4-20250514" into the
+ * Parse a model string like "anthropic/claude-haiku-4-5" into the
  * `{ providerID, modelID }` shape the SDK expects.
  *
  * Returns undefined when `model` is falsy so callers can use optional spread.
@@ -72,19 +68,6 @@ export function parseModel(
     modelID: model.slice(slash + 1),
   }
 }
-
-const ANSWER_SCHEMA = {
-  type: "object",
-  properties: {
-    answer: {
-      type: "string",
-      description:
-        "A concise, direct answer to the question. " +
-        "Include only the information requested — no preamble, no padding.",
-    },
-  },
-  required: ["answer"],
-} as const
 
 /**
  * Create an ephemeral OpenCode sub-session, inject the command output as
@@ -114,7 +97,7 @@ export async function queryWithSubagent(
       },
     })
 
-    // 3. Ask the question and request structured JSON output.
+    // 3. Ask the question.
     const parsedModel = parseModel(config.analystModel)
 
     const result = await client.session.prompt({
@@ -122,15 +105,17 @@ export async function queryWithSubagent(
       body: {
         ...(parsedModel ? { model: parsedModel } : {}),
         parts: [{ type: "text", text: question }],
-        format: {
-          type: "json_schema",
-          schema: ANSWER_SCHEMA,
-        },
       },
     })
 
-    const answer = result.data.info.structured_output?.answer
-    if (typeof answer !== "string" || answer.trim() === "") {
+    // Extract the answer from the text parts returned.
+    const textParts = result.data.parts
+      .filter((p) => p.type === "text" && typeof p.text === "string" && p.text.trim() !== "")
+      .map((p) => p.text as string)
+
+    const answer = textParts.join("\n").trim()
+
+    if (answer === "") {
       throw new Error("Analyst sub-session returned an empty or invalid answer.")
     }
 

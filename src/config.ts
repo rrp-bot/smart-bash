@@ -60,7 +60,6 @@ export const DEFAULT_CONFIG: SmartBashConfig = {
   storePath: join(homedir(), ".local", "share", "smart-bash", "store.db"),
   maxOutputBytes: 2_000_000,
   defaultIntent: "Did this command succeed? Summarize the key output.",
-  analystModel: undefined,
 }
 
 /**

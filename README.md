@@ -136,6 +136,24 @@ When using Method B (npm `"plugin"` array), configure via environment variables:
 
 ---
 
+## Future work
+
+### Pass-through threshold
+
+Currently every `smart_bash` call spins up an analyst sub-session regardless of output size. For small outputs this is wasteful — the overhead of creating an ephemeral session, injecting context, and getting a reply can cost more (in latency and tokens) than simply returning the raw output directly into the main context.
+
+A future `passthroughBytes` config option could short-circuit the analyst when `stdout + stderr` is below a threshold:
+
+```typescript
+createSmartBashPlugin({
+  passthroughBytes: 2_000, // outputs smaller than this skip the analyst
+})
+```
+
+The cutoff is not purely about size though — a 1KB stack trace may be more useful summarised than 10KB of `ls` output. A more nuanced heuristic might combine byte count with output characteristics (line count, presence of structured data, etc.). Worth experimenting with.
+
+---
+
 ## Output truncation
 
 When command output exceeds `maxOutputBytes`, each stream (stdout, stderr) is independently truncated using a **head + tail** strategy:
