@@ -1,0 +1,28 @@
+{
+  "name": "smart-bash",
+  "version": "0.1.0",
+  "description": "OpenCode plugin that routes bash calls through a subagent to prevent context rot from large command output",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --experimental-sqlite --test test/*.test.ts",
+    "test:watch": "node --experimental-strip-types --experimental-sqlite --test --watch test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.2.18",
+    "@opencode-ai/sdk": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "keywords": ["opencode", "plugin", "bash", "smart-bash", "subagent"],
+  "license": "MIT"
+}
