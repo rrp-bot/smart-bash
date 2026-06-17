@@ -1,4 +1,4 @@
-import { DatabaseSync } from "node:sqlite"
+import { Database } from "bun:sqlite"
 import { mkdirSync } from "fs"
 import { dirname } from "path"
 
@@ -35,14 +35,14 @@ CREATE INDEX IF NOT EXISTS executions_created_at ON executions (created_at)
  * Pass ":memory:" as `dbPath` for an in-memory database (useful in tests).
  */
 export class ExecutionStore {
-  private db: DatabaseSync
+  private db: Database
 
   constructor(dbPath: string) {
     if (dbPath !== ":memory:") {
       mkdirSync(dirname(dbPath), { recursive: true })
     }
 
-    this.db = new DatabaseSync(dbPath)
+    this.db = new Database(dbPath)
     this.db.exec("PRAGMA journal_mode = WAL")
     this.db.exec(CREATE_TABLE)
     this.db.exec(CREATE_IDX)
@@ -57,13 +57,13 @@ export class ExecutionStore {
     `)
 
     stmt.run({
-      id: record.id,
-      command: record.command,
-      stdout: record.stdout,
-      stderr: record.stderr,
-      exitCode: record.exitCode,
-      truncated: record.truncated ? 1 : 0,
-      createdAt: record.createdAt,
+      $id: record.id,
+      $command: record.command,
+      $stdout: record.stdout,
+      $stderr: record.stderr,
+      $exitCode: record.exitCode,
+      $truncated: record.truncated ? 1 : 0,
+      $createdAt: record.createdAt,
     })
   }
 
@@ -74,7 +74,7 @@ export class ExecutionStore {
       WHERE id = $id
     `)
 
-    const row = stmt.get({ id }) as RawRow | null
+    const row = stmt.get({ $id: id }) as RawRow | null
     return row ? rowToRecord(row) : null
   }
 
@@ -90,7 +90,7 @@ export class ExecutionStore {
 
   delete(id: string): boolean {
     const stmt = this.db.prepare("DELETE FROM executions WHERE id = $id")
-    const result = stmt.run({ id })
+    const result = stmt.run({ $id: id })
     return result.changes > 0
   }
 
@@ -103,7 +103,7 @@ export class ExecutionStore {
     const stmt = this.db.prepare(
       "DELETE FROM executions WHERE created_at < $cutoff",
     )
-    const result = stmt.run({ cutoff })
+    const result = stmt.run({ $cutoff: cutoff })
     return result.changes
   }
 

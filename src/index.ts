@@ -39,21 +39,22 @@
  */
 
 import type { Plugin } from "@opencode-ai/plugin"
-import { resolveConfig } from "./config.ts"
-import type { SmartBashConfig } from "./config.ts"
-import { ExecutionStore } from "./store.ts"
+import type { ToolDefinition } from "@opencode-ai/plugin/tool"
+import { resolveConfig } from "./config.js"
+import type { SmartBashConfig } from "./config.js"
+import { ExecutionStore } from "./store.js"
 import {
   makeSmartBashTool,
   makeSmartBashQueryTool,
   makeAlwaysBashTool,
-} from "./tools.ts"
-import type { AnalystClient } from "./analyst.ts"
+} from "./tools.js"
+import type { AnalystClient } from "./analyst.js"
 
-export type { SmartBashConfig, SmartBashMode } from "./config.ts"
-export type { ExecutionRecord } from "./store.ts"
-export { ExecutionStore } from "./store.ts"
-export { truncate, truncateStreams } from "./truncate.ts"
-export { buildContextBlock, parseModel } from "./analyst.ts"
+export type { SmartBashConfig, SmartBashMode } from "./config.js"
+export type { ExecutionRecord } from "./store.js"
+export { ExecutionStore } from "./store.js"
+export { truncate, truncateStreams } from "./truncate.js"
+export { buildContextBlock, parseModel } from "./analyst.js"
 
 /**
  * Create a configured Smart Bash plugin.
@@ -81,8 +82,9 @@ export function createSmartBashPlugin(
     const client = ctx.client as unknown as AnalystClient
 
     // Build a shell executor that uses Bun's shell API from the plugin context.
+    // .quiet() suppresses stdout/stderr from being written to the terminal.
     const shell = async (command: string) => {
-      const result = await ctx.$`bash -c ${command}`.nothrow()
+      const result = await ctx.$`bash -c ${command}`.quiet().nothrow()
       return {
         stdout: result.stdout,
         stderr: result.stderr,
@@ -90,7 +92,7 @@ export function createSmartBashPlugin(
       }
     }
 
-    const tools: Record<string, ReturnType<typeof makeSmartBashTool>> = {
+    const tools: Record<string, ToolDefinition> = {
       smart_bash: makeSmartBashTool(client, shell, store, config),
       smart_bash_query: makeSmartBashQueryTool(client, store, config),
     }

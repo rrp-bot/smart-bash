@@ -1,9 +1,10 @@
-import { tool } from "@opencode-ai/plugin"
-import type { SmartBashConfig } from "./config.ts"
-import type { ExecutionStore } from "./store.ts"
-import type { AnalystClient } from "./analyst.ts"
-import { queryWithSubagent } from "./analyst.ts"
-import { truncateStreams } from "./truncate.ts"
+import { tool } from "@opencode-ai/plugin/tool"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
+import type { SmartBashConfig } from "./config.js"
+import type { ExecutionStore } from "./store.js"
+import type { AnalystClient } from "./analyst.js"
+import { queryWithSubagent } from "./analyst.js"
+import { truncateStreams } from "./truncate.js"
 
 // The Bun shell result shape we depend on (subset of ShellOutput).
 export interface ShellResult {
@@ -61,7 +62,7 @@ export function makeSmartBashTool(
             "\"What is the total bundle size?\"",
         ),
     },
-    async execute(args): Promise<string> {
+    async execute(args, _context: ToolContext): Promise<string> {
       const { command, intent } = args
       const id = crypto.randomUUID()
       const now = Date.now()
@@ -101,14 +102,12 @@ export function makeSmartBashTool(
         config,
       )
 
-      const out: SmartBashResult = {
-        answer,
-        execution_id: id,
-        exit_code: result.exitCode,
-        truncated,
-      }
+      _context.metadata({
+        title: `smart_bash: ${command}`,
+        metadata: { execution_id: id, exit_code: result.exitCode, truncated },
+      })
 
-      return JSON.stringify(out)
+      return answer
     },
   })
 }
@@ -140,7 +139,7 @@ export function makeSmartBashQueryTool(
             "E.g. \"How many tests were skipped?\", \"List the failing file names.\"",
         ),
     },
-    async execute(args): Promise<string> {
+    async execute(args, _context: ToolContext): Promise<string> {
       const { execution_id, question } = args
       const record = store.get(execution_id)
 
@@ -156,12 +155,12 @@ export function makeSmartBashQueryTool(
         config,
       )
 
-      const out: SmartBashQueryResult = {
-        answer,
-        execution_id,
-      }
+      _context.metadata({
+        title: `smart_bash_query: ${execution_id}`,
+        metadata: { execution_id },
+      })
 
-      return JSON.stringify(out)
+      return answer
     },
   })
 }
@@ -194,7 +193,7 @@ export function makeAlwaysBashTool(
             "Defaults to a general success/summary check.",
         ),
     },
-    async execute(args): Promise<string> {
+    async execute(args, _context: ToolContext): Promise<string> {
       const { command, intent = config.defaultIntent } = args
       const id = crypto.randomUUID()
       const now = Date.now()
@@ -231,14 +230,12 @@ export function makeAlwaysBashTool(
         config,
       )
 
-      const out: SmartBashResult = {
-        answer,
-        execution_id: id,
-        exit_code: result.exitCode,
-        truncated,
-      }
+      _context.metadata({
+        title: `bash: ${command}`,
+        metadata: { execution_id: id, exit_code: result.exitCode, truncated },
+      })
 
-      return JSON.stringify(out)
+      return answer
     },
   })
 }
