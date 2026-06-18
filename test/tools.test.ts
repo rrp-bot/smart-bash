@@ -50,11 +50,12 @@ const defaultConfig = resolveConfig({ storePath: ":memory:" })
 // ── smart_bash ────────────────────────────────────────────────────────────────
 
 describe("makeSmartBashTool", () => {
-  it("returns the analyst answer string", async () => {
+  it("returns the analyst answer string with execution_id prefix", async () => {
     const store = makeStore()
     const tool = makeSmartBashTool(makeClient("yes, all tests passed"), makeShell(), store, defaultConfig)
     const result = await exec(tool, { command: "npm test", intent: "Did tests pass?" })
-    assert.equal(result, "yes, all tests passed")
+    assert.match(result, /^execution_id: [0-9a-f-]{36}\n\n/)
+    assert.match(result, /yes, all tests passed/)
     store.close()
   })
 
@@ -232,7 +233,7 @@ describe("makeAlwaysBashTool", () => {
     const store = makeStore()
     const tool = makeAlwaysBashTool(makeClient("success"), makeShell(), store, defaultConfig)
     const result = await exec(tool, { command: "echo hi" })
-    assert.equal(result, "success")
+    assert.match(result, /success/)
     store.close()
   })
 })
