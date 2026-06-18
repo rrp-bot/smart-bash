@@ -77,7 +77,7 @@ export function makeSmartBashTool(
         metadata: { execution_id: id, exit_code: result.exitCode, truncated },
       })
 
-      return answer
+      return `execution_id: ${id}\n\n${answer}`
     },
   })
 }
@@ -182,7 +182,7 @@ export function makeAlwaysBashTool(
         metadata: { execution_id: id, exit_code: result.exitCode, truncated },
       })
 
-      return answer
+      return `execution_id: ${id}\n\n${answer}`
     },
   })
 }
