@@ -62,7 +62,30 @@ Replaces the built-in `bash` tool. Same interface, but every call is automatical
 
 ## Installation
 
-### Method A — Local dependency (recommended for configuration)
+### Method A — Pre-built bundle from GitHub Releases (recommended, no bun/npm required)
+
+Download the self-contained bundle and drop it into your OpenCode plugins directory. All npm dependencies are bundled in; only `bun:sqlite` is used at runtime (provided by OpenCode's Bun environment).
+
+**Global (all projects):**
+```bash
+curl -L https://github.com/rrp-bot/smart-bash/releases/latest/download/smart-bash.js \
+  -o ~/.config/opencode/plugins/smart-bash.js
+```
+
+**Project-local:**
+```bash
+mkdir -p .opencode/plugins
+curl -L https://github.com/rrp-bot/smart-bash/releases/latest/download/smart-bash.js \
+  -o .opencode/plugins/smart-bash.js
+```
+
+The bundle uses defaults (`mode: "auto"`). Configure via environment variables (see [Configuration](#configuration)).
+
+Restart OpenCode — no further setup needed.
+
+---
+
+### Method B — Local dependency (for code-based configuration)
 
 Add `smart-bash` to your project's OpenCode package file. OpenCode runs `bun install` automatically at startup.
 
@@ -87,7 +110,7 @@ export default createSmartBashPlugin({
 })
 ```
 
-### Method B — npm (once published, zero-config)
+### Method C — npm (once published, zero-config)
 
 Add the package name to the `"plugin"` array in `opencode.json`. OpenCode installs it automatically from npm.
 

@@ -14,13 +14,16 @@
   "scripts": {
     "test": "node --experimental-strip-types --experimental-sqlite --test test/*.test.ts",
     "test:watch": "node --experimental-strip-types --experimental-sqlite --test --watch test/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "build:bundle": "esbuild src/index.ts --bundle --platform=node --format=esm --external:node:* --external:bun:* --outfile=dist/smart-bash.js"
   },
   "dependencies": {
     "@opencode-ai/plugin": "^1.2.18",
     "@opencode-ai/sdk": "latest"
   },
   "devDependencies": {
+    "esbuild": "^0.25.0",
     "typescript": "^5.0.0"
   },
   "keywords": ["opencode", "plugin", "bash", "smart-bash", "subagent"],

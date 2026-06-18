@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build bundle
+        run: npm run build:bundle
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/smart-bash.js
+          generate_release_notes: true
+          fail_on_unmatched_files: true
