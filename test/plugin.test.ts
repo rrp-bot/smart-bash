@@ -19,6 +19,9 @@ function makeMockCtx() {
 
   return {
     client: {
+      app: {
+        log: async () => ({}),
+      },
       session: {
         create: async () => ({ data: { id: "sess-mock" } }),
         prompt: async () => ({

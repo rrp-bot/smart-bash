@@ -113,6 +113,7 @@ function makeMockClient(answerOverride?: string): { client: AnalystClient; calls
         return {}
       },
     },
+    app: { log: async () => ({}) },
   }
 
   return { client, calls }
@@ -191,6 +192,7 @@ describe("queryWithSubagent", () => {
           return {}
         },
       },
+      app: { log: async () => ({}) },
     }
 
     await assert.rejects(
@@ -228,6 +230,7 @@ describe("queryWithSubagent", () => {
         prompt: async () => ({ data: { parts: [] } }),
         delete: async () => ({}),
       },
+      app: { log: async () => ({}) },
     }
 
     await assert.rejects(

@@ -81,6 +81,23 @@ export function createSmartBashPlugin(
     // The real OpenCode client satisfies this shape.
     const client = ctx.client as unknown as AnalystClient
 
+    // Log plugin initialization.
+    client.app
+      .log({
+        body: {
+          service: "smart-bash",
+          level: "info",
+          message: "smart-bash plugin initialized",
+          extra: {
+            mode: config.mode,
+            analystModel: config.analystModel ?? "(default)",
+            analystTimeoutMs: config.analystTimeoutMs,
+            storePath: config.storePath,
+          },
+        },
+      })
+      .catch(() => {})
+
     // Build a shell executor that uses Bun's shell API from the plugin context.
     // .quiet() suppresses stdout/stderr from being written to the terminal.
     const shell = async (command: string) => {

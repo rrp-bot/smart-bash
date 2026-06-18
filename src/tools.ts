@@ -6,6 +6,17 @@ import type { AnalystClient } from "./analyst.js"
 import { queryWithSubagent } from "./analyst.js"
 import { truncateStreams } from "./truncate.js"
 
+type LogLevel = "debug" | "info" | "warn" | "error"
+
+function log(
+  client: AnalystClient,
+  level: LogLevel,
+  message: string,
+  extra?: Record<string, unknown>,
+): void {
+  client.app.log({ body: { service: "smart-bash", level, message, extra } }).catch(() => {})
+}
+
 // The Bun shell result shape we depend on (subset of ShellOutput).
 export interface ShellResult {
   stdout: Buffer | string
@@ -53,6 +64,8 @@ export function makeSmartBashTool(
       const id = crypto.randomUUID()
       const now = Date.now()
 
+      log(client, "info", "smart_bash: running command", { command, executionId: id })
+
       const result = await shell(command)
       const rawStdout = typeof result.stdout === "string"
         ? result.stdout
@@ -67,10 +80,22 @@ export function makeSmartBashTool(
         config.maxOutputBytes,
       )
 
+      if (truncated) {
+        log(client, "warn", "smart_bash: output truncated", { command, executionId: id, maxOutputBytes: config.maxOutputBytes })
+      }
+
       const record = { id, command, stdout, stderr, exitCode: result.exitCode, truncated, createdAt: now }
       store.set(record)
 
-      const answer = await queryWithSubagent(client, { record, question: intent }, config)
+      let answer: string
+      try {
+        answer = await queryWithSubagent(client, { record, question: intent }, config)
+      } catch (err) {
+        log(client, "error", "smart_bash: analyst query failed", { command, executionId: id, error: String(err) })
+        throw err
+      }
+
+      log(client, "info", "smart_bash: answer ready", { command, executionId: id, exitCode: result.exitCode })
 
       context.metadata({
         title: `smart_bash: ${command}`,
@@ -111,10 +136,19 @@ export function makeSmartBashQueryTool(
       const record = store.get(execution_id)
 
       if (!record) {
+        log(client, "warn", "smart_bash_query: unknown execution_id", { executionId: execution_id })
         return JSON.stringify({ error: `No execution found with id: ${execution_id}` })
       }
 
-      const answer = await queryWithSubagent(client, { record, question }, config)
+      log(client, "info", "smart_bash_query: querying execution", { executionId: execution_id })
+
+      let answer: string
+      try {
+        answer = await queryWithSubagent(client, { record, question }, config)
+      } catch (err) {
+        log(client, "error", "smart_bash_query: analyst query failed", { executionId: execution_id, error: String(err) })
+        throw err
+      }
 
       context.metadata({
         title: `smart_bash_query: ${execution_id}`,
@@ -158,6 +192,8 @@ export function makeAlwaysBashTool(
       const id = crypto.randomUUID()
       const now = Date.now()
 
+      log(client, "info", "bash: running command", { command, executionId: id })
+
       const result = await shell(command)
       const rawStdout = typeof result.stdout === "string"
         ? result.stdout
@@ -172,10 +208,22 @@ export function makeAlwaysBashTool(
         config.maxOutputBytes,
       )
 
+      if (truncated) {
+        log(client, "warn", "bash: output truncated", { command, executionId: id, maxOutputBytes: config.maxOutputBytes })
+      }
+
       const record = { id, command, stdout, stderr, exitCode: result.exitCode, truncated, createdAt: now }
       store.set(record)
 
-      const answer = await queryWithSubagent(client, { record, question: intent }, config)
+      let answer: string
+      try {
+        answer = await queryWithSubagent(client, { record, question: intent }, config)
+      } catch (err) {
+        log(client, "error", "bash: analyst query failed", { command, executionId: id, error: String(err) })
+        throw err
+      }
+
+      log(client, "info", "bash: answer ready", { command, executionId: id, exitCode: result.exitCode })
 
       context.metadata({
         title: `bash: ${command}`,
