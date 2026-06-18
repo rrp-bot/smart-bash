@@ -81,6 +81,20 @@ export async function queryWithSubagent(
   params: AnalystParams,
   config: SmartBashConfig,
 ): Promise<string> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error(`Analyst sub-session timed out after ${config.analystTimeoutMs}ms`)),
+      config.analystTimeoutMs,
+    ),
+  )
+  return Promise.race([_queryWithSubagent(client, params, config), timeout])
+}
+
+async function _queryWithSubagent(
+  client: AnalystClient,
+  params: AnalystParams,
+  config: SmartBashConfig,
+): Promise<string> {
   const { record, question } = params
 
   // 1. Create an ephemeral session.

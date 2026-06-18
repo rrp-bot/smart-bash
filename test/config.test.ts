@@ -106,6 +106,7 @@ describe("resolveConfig", () => {
       maxOutputBytes: 100_000,
       defaultIntent: "Did it work?",
       analystModel: "openai/gpt-4o-mini",
+      analystTimeoutMs: 30_000,
     }
     const cfg = resolveConfig(full)
     assert.deepEqual(cfg, full)

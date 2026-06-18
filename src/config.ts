@@ -53,6 +53,14 @@ export interface SmartBashConfig {
    * the model of the calling session.
    */
   analystModel?: string
+
+  /**
+   * Maximum milliseconds to wait for the analyst sub-session to respond.
+   * If the LLM call exceeds this, the tool returns a timeout error message
+   * rather than hanging indefinitely.
+   * @default 30_000
+   */
+  analystTimeoutMs: number
 }
 
 export const DEFAULT_CONFIG: SmartBashConfig = {
@@ -60,6 +68,7 @@ export const DEFAULT_CONFIG: SmartBashConfig = {
   storePath: join(homedir(), ".local", "share", "smart-bash", "store.db"),
   maxOutputBytes: 2_000_000,
   defaultIntent: "Did this command succeed? Summarize the key output.",
+  analystTimeoutMs: 30_000,
 }
 
 /**
