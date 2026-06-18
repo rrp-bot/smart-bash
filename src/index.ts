@@ -38,8 +38,6 @@
  *   SMART_BASH_STORE_PATH      path to SQLite DB (default: ~/.local/share/…)
  */
 
-import type { Plugin } from "@opencode-ai/plugin"
-import type { ToolDefinition } from "@opencode-ai/plugin/tool"
 import { resolveConfig } from "./config.js"
 import type { SmartBashConfig } from "./config.js"
 import { ExecutionStore } from "./store.js"
@@ -48,7 +46,19 @@ import {
   makeSmartBashQueryTool,
   makeAlwaysBashTool,
 } from "./tools.js"
+import type { ToolDefinition } from "./tools.js"
 import type { AnalystClient } from "./analyst.js"
+
+/** Plugin context shape OpenCode passes to the plugin function. */
+export interface PluginContext {
+  client: unknown
+  $: (strings: TemplateStringsArray, ...values: unknown[]) => {
+    quiet(): { nothrow(): Promise<{ stdout: Buffer; stderr: Buffer; exitCode: number }> }
+  }
+}
+
+/** A Plugin is an async function returning a record of tool definitions. */
+export type Plugin = (ctx: PluginContext) => Promise<{ tool: Record<string, ToolDefinition> }>
 
 export type { SmartBashConfig, SmartBashMode } from "./config.js"
 export type { ExecutionRecord } from "./store.js"

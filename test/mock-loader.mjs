@@ -22,26 +22,6 @@ import { DatabaseSync } from "node:sqlite";
 export { DatabaseSync as Database };
 `,
 
-  "@opencode-ai/plugin": `
-export function tool(def) { return def; }
-const schemaField = () => {
-  const field = { describe: () => field, optional: () => field };
-  return field;
-};
-tool.schema = { string: schemaField };
-export default {};
-`,
-
-  "@opencode-ai/plugin/tool": `
-export function tool(def) { return def; }
-const schemaField = () => {
-  const field = { describe: () => field, optional: () => field };
-  return field;
-};
-tool.schema = { string: schemaField };
-export { tool as default };
-`,
-
   "@opencode-ai/sdk": `export default {};`,
 }
 
