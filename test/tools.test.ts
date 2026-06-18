@@ -24,7 +24,28 @@ function makeClient(answer = "mocked answer"): AnalystClient {
       prompt: async () => ({ data: { parts: [{ type: "text", text: answer }] } }),
       delete: async () => ({}),
     },
+    app: {
+      log: async () => ({}),
+    },
   }
+}
+
+type LogCall = { level: string; message: string; extra?: Record<string, unknown> }
+
+/** Like makeClient but records every app.log call for inspection. */
+function makeCapturingClient(answer = "mocked answer"): { client: AnalystClient; logs: LogCall[] } {
+  const logs: LogCall[] = []
+  const client: AnalystClient = {
+    session: {
+      create: async () => ({ data: { id: "sess-1" } }),
+      prompt: async () => ({ data: { parts: [{ type: "text", text: answer }] } }),
+      delete: async () => ({}),
+    },
+    app: {
+      log: async (opts) => { logs.push(opts.body as LogCall); return {} },
+    },
+  }
+  return { client, logs }
 }
 
 function makeShell(
@@ -106,6 +127,7 @@ describe("makeSmartBashTool", () => {
         prompt: async () => { throw new Error("analyst down") },
         delete: async () => ({}),
       },
+      app: { log: async () => ({}) },
     }
 
     const tool = makeSmartBashTool(failingClient, makeShell(), store, defaultConfig)
@@ -116,6 +138,36 @@ describe("makeSmartBashTool", () => {
     )
 
     assert.equal(store.list().length, 1)
+    store.close()
+  })
+
+  it("emits a warn log when output is truncated", async () => {
+    const store = makeStore()
+    const { client, logs } = makeCapturingClient()
+    const smallMax = resolveConfig({ storePath: ":memory:", maxOutputBytes: 100 })
+    const tool = makeSmartBashTool(client, makeShell(makeOutput(500)), store, smallMax)
+    await exec(tool, { command: "big cmd", intent: "summarize" })
+    const warnLogs = logs.filter((l) => l.level === "warn")
+    assert.ok(warnLogs.length > 0, "expected at least one warn log")
+    assert.ok(warnLogs.some((l) => l.message.includes("truncated")), "warn log should mention truncation")
+    store.close()
+  })
+
+  it("emits an error log when the analyst throws", async () => {
+    const store = makeStore()
+    const logs: LogCall[] = []
+    const failingClient: AnalystClient = {
+      session: {
+        create: async () => ({ data: { id: "s" } }),
+        prompt: async () => { throw new Error("analyst down") },
+        delete: async () => ({}),
+      },
+      app: { log: async (opts) => { logs.push(opts.body as LogCall); return {} } },
+    }
+    const tool = makeSmartBashTool(failingClient, makeShell(), store, defaultConfig)
+    await assert.rejects(() => exec(tool, { command: "cmd", intent: "?" }), /analyst down/)
+    const errorLogs = logs.filter((l) => l.level === "error")
+    assert.ok(errorLogs.length > 0, "expected at least one error log")
     store.close()
   })
 })
@@ -171,6 +223,7 @@ describe("makeSmartBashQueryTool", () => {
         prompt: async () => ({ data: { parts: [{ type: "text", text: `answer ${createCount}` }] } }),
         delete: async () => ({}),
       },
+      app: { log: async () => ({}) },
     }
 
     const tool = makeSmartBashQueryTool(countingClient, store, defaultConfig)
@@ -200,6 +253,7 @@ describe("makeAlwaysBashTool", () => {
         },
         delete: async () => ({}),
       },
+      app: { log: async () => ({}) },
     }
 
     const tool = makeAlwaysBashTool(capturingClient, makeShell(), store, cfg)
@@ -221,6 +275,7 @@ describe("makeAlwaysBashTool", () => {
         },
         delete: async () => ({}),
       },
+      app: { log: async () => ({}) },
     }
 
     const tool = makeAlwaysBashTool(capturingClient, makeShell(), store, defaultConfig)

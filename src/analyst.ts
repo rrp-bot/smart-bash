@@ -1,6 +1,8 @@
 import type { SmartBashConfig } from "./config.js"
 import type { ExecutionRecord } from "./store.js"
 
+type LogLevel = "debug" | "info" | "warn" | "error"
+
 // Minimal types for the parts of the OpenCode client we use, so callers don't
 // need to import the full SDK in tests and we keep the surface narrow.
 export interface AnalystClient {
@@ -16,6 +18,21 @@ export interface AnalystClient {
     }): Promise<{ data: { parts: Array<{ type: string; text?: string }> } }>
     delete(opts: { path: { id: string } }): Promise<unknown>
   }
+  app: {
+    log(opts: {
+      body: { service: string; level: LogLevel; message: string; extra?: Record<string, unknown> }
+    }): Promise<unknown>
+  }
+}
+
+function log(
+  client: AnalystClient,
+  level: LogLevel,
+  message: string,
+  extra?: Record<string, unknown>,
+): void {
+  // Fire-and-forget — logging must never throw or block the tool.
+  client.app.log({ body: { service: "smart-bash", level, message, extra } }).catch(() => {})
 }
 
 /** Parameters for a single analyst query. */
@@ -81,13 +98,23 @@ export async function queryWithSubagent(
   params: AnalystParams,
   config: SmartBashConfig,
 ): Promise<string> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(
-      () => reject(new Error(`Analyst sub-session timed out after ${config.analystTimeoutMs}ms`)),
-      config.analystTimeoutMs,
-    ),
-  )
-  return Promise.race([_queryWithSubagent(client, params, config), timeout])
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      log(client, "warn", "analyst sub-session timed out", {
+        executionId: params.record.id,
+        timeoutMs: config.analystTimeoutMs,
+      })
+      reject(new Error(`Analyst sub-session timed out after ${config.analystTimeoutMs}ms`))
+    }, config.analystTimeoutMs)
+    // unref so the timer doesn't keep the process alive after all other work is done
+    timer.unref()
+  })
+  try {
+    return await Promise.race([_queryWithSubagent(client, params, config), timeout])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function _queryWithSubagent(
@@ -100,6 +127,7 @@ async function _queryWithSubagent(
   // 1. Create an ephemeral session.
   const created = await client.session.create({ body: {} })
   const sessionId = created.data.id
+  log(client, "debug", "analyst sub-session created", { sessionId, executionId: record.id })
 
   try {
     // 2. Inject the command output as context — no AI reply triggered.
@@ -110,9 +138,11 @@ async function _queryWithSubagent(
         parts: [{ type: "text", text: buildContextBlock(record) }],
       },
     })
+    log(client, "debug", "analyst context injected", { sessionId, command: record.command, truncated: record.truncated })
 
     // 3. Ask the question.
     const parsedModel = parseModel(config.analystModel)
+    log(client, "debug", "analyst question sent", { sessionId, model: config.analystModel ?? "(default)" })
 
     const result = await client.session.prompt({
       path: { id: sessionId },
@@ -130,14 +160,17 @@ async function _queryWithSubagent(
     const answer = textParts.join("\n").trim()
 
     if (answer === "") {
+      log(client, "error", "analyst returned empty answer", { sessionId, executionId: record.id })
       throw new Error("Analyst sub-session returned an empty or invalid answer.")
     }
 
+    log(client, "debug", "analyst answer received", { sessionId, answerLength: answer.length })
     return answer
   } finally {
     // 4. Always clean up the ephemeral session.
     await client.session.delete({ path: { id: sessionId } }).catch(() => {
       /* best-effort — don't mask the original error */
     })
+    log(client, "debug", "analyst sub-session deleted", { sessionId })
   }
 }
