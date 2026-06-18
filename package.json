@@ -16,7 +16,7 @@
     "test:watch": "NODE_OPTIONS='--import ./test/register-mocks.mjs' node --experimental-strip-types --experimental-sqlite --import ./test/register-mocks.mjs --test --watch test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
-    "build:bundle": "esbuild src/index.ts --bundle --platform=node --format=esm --target=esnext --external:node:* --external:bun:* --outfile=dist/smart-bash.js"
+    "build:bundle": "esbuild src/bundle-entry.ts --bundle --platform=node --format=esm --target=esnext --external:node:* --external:bun:* --outfile=dist/smart-bash.js"
   },
   "dependencies": {},
   "devDependencies": {
