@@ -21,7 +21,7 @@ function makeClient(answer = "mocked answer"): AnalystClient {
   return {
     session: {
       create: async () => ({ data: { id: "sess-1" } }),
-      prompt: async () => ({ data: { info: { structured_output: { answer } } } }),
+      prompt: async () => ({ data: { parts: [{ type: "text", text: answer }] } }),
       delete: async () => ({}),
     },
   }
@@ -39,10 +39,10 @@ function makeShell(
   })
 }
 
-type ToolLike = { execute: (args: Record<string, unknown>) => Promise<string> }
+type ToolLike = { execute: (args: Record<string, unknown>, ctx: { metadata: (m: unknown) => void }) => Promise<string> }
 
 function exec(t: unknown, args: Record<string, unknown>) {
-  return (t as ToolLike).execute(args)
+  return (t as ToolLike).execute(args, { metadata: () => {} })
 }
 
 const defaultConfig = resolveConfig({ storePath: ":memory:" })
@@ -50,56 +50,50 @@ const defaultConfig = resolveConfig({ storePath: ":memory:" })
 // ── smart_bash ────────────────────────────────────────────────────────────────
 
 describe("makeSmartBashTool", () => {
-  it("returns answer and execution_id", async () => {
+  it("returns the analyst answer string", async () => {
     const store = makeStore()
     const tool = makeSmartBashTool(makeClient("yes, all tests passed"), makeShell(), store, defaultConfig)
-    const result = JSON.parse(await exec(tool, { command: "npm test", intent: "Did tests pass?" }))
-    assert.equal(result.answer, "yes, all tests passed")
-    assert.ok(typeof result.execution_id === "string" && result.execution_id.length > 0)
-    store.close()
-  })
-
-  it("execution_id is a valid UUID (8-4-4-4-12 format)", async () => {
-    const store = makeStore()
-    const tool = makeSmartBashTool(makeClient(), makeShell(), store, defaultConfig)
-    const { execution_id } = JSON.parse(await exec(tool, { command: "echo hi", intent: "any?" }))
-    assert.match(execution_id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+    const result = await exec(tool, { command: "npm test", intent: "Did tests pass?" })
+    assert.equal(result, "yes, all tests passed")
     store.close()
   })
 
   it("stores the execution record in the store", async () => {
     const store = makeStore()
     const tool = makeSmartBashTool(makeClient(), makeShell(), store, defaultConfig)
-    const { execution_id } = JSON.parse(await exec(tool, { command: "ls -la", intent: "how many files?" }))
-    const record = store.get(execution_id)
-    assert.ok(record !== null)
-    assert.equal(record.command, "ls -la")
-    assert.equal(record.stdout, SMALL_STDOUT)
+    await exec(tool, { command: "ls -la", intent: "how many files?" })
+    const records = store.list()
+    assert.equal(records.length, 1)
+    assert.equal(records[0]!.command, "ls -la")
+    assert.equal(records[0]!.stdout, SMALL_STDOUT)
     store.close()
   })
 
-  it("captures exit_code in the response", async () => {
+  it("stored record has correct exit code", async () => {
     const store = makeStore()
     const tool = makeSmartBashTool(makeClient(), makeShell(SMALL_STDOUT, "", 1), store, defaultConfig)
-    const result = JSON.parse(await exec(tool, { command: "false", intent: "did it fail?" }))
-    assert.equal(result.exit_code, 1)
+    await exec(tool, { command: "false", intent: "did it fail?" })
+    const records = store.list()
+    assert.equal(records[0]!.exitCode, 1)
     store.close()
   })
 
   it("captures stderr in the stored record", async () => {
     const store = makeStore()
     const tool = makeSmartBashTool(makeClient(), makeShell("", "error output", 0), store, defaultConfig)
-    const { execution_id } = JSON.parse(await exec(tool, { command: "cmd", intent: "errors?" }))
-    assert.equal(store.get(execution_id)!.stderr, "error output")
+    await exec(tool, { command: "cmd", intent: "errors?" })
+    const records = store.list()
+    assert.equal(records[0]!.stderr, "error output")
     store.close()
   })
 
-  it("sets truncated=true in response for large output", async () => {
+  it("sets truncated=true in stored record for large output", async () => {
     const store = makeStore()
     const smallMax = resolveConfig({ storePath: ":memory:", maxOutputBytes: 100 })
     const tool = makeSmartBashTool(makeClient(), makeShell(makeOutput(500)), store, smallMax)
-    const result = JSON.parse(await exec(tool, { command: "big cmd", intent: "summarize" }))
-    assert.equal(result.truncated, true)
+    await exec(tool, { command: "big cmd", intent: "summarize" })
+    const records = store.list()
+    assert.equal(records[0]!.truncated, true)
     store.close()
   })
 
@@ -128,7 +122,7 @@ describe("makeSmartBashTool", () => {
 // ── smart_bash_query ──────────────────────────────────────────────────────────
 
 describe("makeSmartBashQueryTool", () => {
-  it("returns answer for a stored execution_id", async () => {
+  it("returns the analyst answer for a stored execution_id", async () => {
     const store = makeStore()
     store.set({
       id: "known-id",
@@ -141,15 +135,12 @@ describe("makeSmartBashQueryTool", () => {
     })
 
     const tool = makeSmartBashQueryTool(makeClient("3 tests skipped"), store, defaultConfig)
-    const result = JSON.parse(
-      await exec(tool, { execution_id: "known-id", question: "How many tests were skipped?" }),
-    )
-    assert.equal(result.answer, "3 tests skipped")
-    assert.equal(result.execution_id, "known-id")
+    const result = await exec(tool, { execution_id: "known-id", question: "How many tests were skipped?" })
+    assert.equal(result, "3 tests skipped")
     store.close()
   })
 
-  it("returns error object for unknown execution_id", async () => {
+  it("returns error JSON for unknown execution_id", async () => {
     const store = makeStore()
     const tool = makeSmartBashQueryTool(makeClient(), store, defaultConfig)
     const result = JSON.parse(
@@ -176,7 +167,7 @@ describe("makeSmartBashQueryTool", () => {
     const countingClient: AnalystClient = {
       session: {
         create: async () => ({ data: { id: `s${++createCount}` } }),
-        prompt: async () => ({ data: { info: { structured_output: { answer: `answer ${createCount}` } } } }),
+        prompt: async () => ({ data: { parts: [{ type: "text", text: `answer ${createCount}` }] } }),
         delete: async () => ({}),
       },
     }
@@ -204,7 +195,7 @@ describe("makeAlwaysBashTool", () => {
         prompt: async (opts) => {
           const body = opts.body as { noReply?: boolean; parts: Array<{ text: string }> }
           if (!body.noReply) capturedQuestion = body.parts[0]?.text ?? ""
-          return { data: { info: { structured_output: { answer: "ok" } } } }
+          return { data: { parts: [{ type: "text", text: "ok" }] } }
         },
         delete: async () => ({}),
       },
@@ -225,7 +216,7 @@ describe("makeAlwaysBashTool", () => {
         prompt: async (opts) => {
           const body = opts.body as { noReply?: boolean; parts: Array<{ text: string }> }
           if (!body.noReply) capturedQuestion = body.parts[0]?.text ?? ""
-          return { data: { info: { structured_output: { answer: "ok" } } } }
+          return { data: { parts: [{ type: "text", text: "ok" }] } }
         },
         delete: async () => ({}),
       },
@@ -237,14 +228,11 @@ describe("makeAlwaysBashTool", () => {
     store.close()
   })
 
-  it("returns answer, execution_id, exit_code, truncated", async () => {
+  it("returns the analyst answer string", async () => {
     const store = makeStore()
     const tool = makeAlwaysBashTool(makeClient("success"), makeShell(), store, defaultConfig)
-    const result = JSON.parse(await exec(tool, { command: "echo hi" }))
-    assert.ok(result.answer)
-    assert.ok(typeof result.execution_id === "string")
-    assert.ok(typeof result.exit_code === "number")
-    assert.ok(typeof result.truncated === "boolean")
+    const result = await exec(tool, { command: "echo hi" })
+    assert.equal(result, "success")
     store.close()
   })
 })

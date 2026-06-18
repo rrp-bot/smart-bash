@@ -104,9 +104,7 @@ function makeMockClient(answerOverride?: string): { client: AnalystClient; calls
         calls.push({ method: "session.prompt", args: [opts] })
         return {
           data: {
-            info: {
-              structured_output: { answer: answerOverride ?? "mocked answer" },
-            },
+            parts: [{ type: "text", text: answerOverride ?? "mocked answer" }],
           },
         }
       },
@@ -155,14 +153,6 @@ describe("queryWithSubagent", () => {
     assert.ok(text.includes(SAMPLE_RECORD.stdout))
   })
 
-  it("second prompt call uses json_schema format", async () => {
-    const { client, calls } = makeMockClient()
-    await queryWithSubagent(client, { record: SAMPLE_RECORD, question: "?" }, config)
-    const secondPrompt = calls.filter((c) => c.method === "session.prompt")[1]!
-    const body = (secondPrompt.args[0] as { body: { format?: { type: string } } }).body
-    assert.equal(body.format?.type, "json_schema")
-  })
-
   it("second prompt contains the question text", async () => {
     const { client, calls } = makeMockClient()
     const question = "how many tests failed?"
@@ -172,7 +162,7 @@ describe("queryWithSubagent", () => {
     assert.equal(body.parts[0]?.text, question)
   })
 
-  it("returns the answer from structured_output", async () => {
+  it("returns the answer from text parts", async () => {
     const { client } = makeMockClient("all 47 tests passed")
     const answer = await queryWithSubagent(client, { record: SAMPLE_RECORD, question: "?" }, config)
     assert.equal(answer, "all 47 tests passed")
@@ -231,11 +221,11 @@ describe("queryWithSubagent", () => {
     })
   })
 
-  it("throws when structured_output answer is missing", async () => {
+  it("throws when answer parts are empty", async () => {
     const badClient: AnalystClient = {
       session: {
         create: async () => ({ data: { id: "s2" } }),
-        prompt: async () => ({ data: { info: { structured_output: {} } } }),
+        prompt: async () => ({ data: { parts: [] } }),
         delete: async () => ({}),
       },
     }
