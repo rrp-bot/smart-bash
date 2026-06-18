@@ -130,7 +130,16 @@ async function _queryWithSubagent(
   log(client, "debug", "analyst sub-session created", { sessionId, executionId: record.id })
 
   try {
-    // 2. Inject the command output as context — no AI reply triggered.
+    // 2. Inject the system prompt to shape analyst tone/verbosity — no reply triggered.
+    await client.session.prompt({
+      path: { id: sessionId },
+      body: {
+        noReply: true,
+        parts: [{ type: "text", text: config.analystSystemPrompt }],
+      },
+    })
+
+    // 3. Inject the command output as context — no AI reply triggered.
     await client.session.prompt({
       path: { id: sessionId },
       body: {
@@ -140,7 +149,7 @@ async function _queryWithSubagent(
     })
     log(client, "debug", "analyst context injected", { sessionId, command: record.command, truncated: record.truncated })
 
-    // 3. Ask the question.
+    // 4. Ask the question.
     const parsedModel = parseModel(config.analystModel)
     log(client, "debug", "analyst question sent", { sessionId, model: config.analystModel ?? "(default)" })
 
@@ -167,7 +176,7 @@ async function _queryWithSubagent(
     log(client, "debug", "analyst answer received", { sessionId, answerLength: answer.length })
     return answer
   } finally {
-    // 4. Always clean up the ephemeral session.
+    // 5. Always clean up the ephemeral session.
     await client.session.delete({ path: { id: sessionId } }).catch(() => {
       /* best-effort — don't mask the original error */
     })

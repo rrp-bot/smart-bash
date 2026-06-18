@@ -61,7 +61,20 @@ export interface SmartBashConfig {
    * @default 30_000
    */
   analystTimeoutMs: number
+
+  /**
+   * System prompt injected into every analyst sub-session before the command
+   * output context. Shapes the analyst's tone and verbosity.
+   * @default (terse analyst prompt)
+   */
+  analystSystemPrompt: string
 }
+
+export const DEFAULT_ANALYST_SYSTEM_PROMPT =
+  "You are a concise command output analyst. " +
+  "Answer only what is asked. Be brief and direct. " +
+  "No preamble, no explanation, no unsolicited commentary. " +
+  "If more detail is needed, the caller will ask."
 
 export const DEFAULT_CONFIG: SmartBashConfig = {
   mode: "auto",
@@ -69,6 +82,7 @@ export const DEFAULT_CONFIG: SmartBashConfig = {
   maxOutputBytes: 2_000_000,
   defaultIntent: "Did this command succeed? Summarize the key output.",
   analystTimeoutMs: 30_000,
+  analystSystemPrompt: DEFAULT_ANALYST_SYSTEM_PROMPT,
 }
 
 /**

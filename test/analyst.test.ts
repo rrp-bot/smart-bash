@@ -129,38 +129,49 @@ describe("queryWithSubagent", () => {
     assert.equal(creates.length, 1)
   })
 
-  it("calls session.prompt twice (context inject then question)", async () => {
+  it("calls session.prompt three times (system prompt, context inject, question)", async () => {
     const { client, calls } = makeMockClient()
     await queryWithSubagent(client, { record: SAMPLE_RECORD, question: "did it work?" }, config)
     const prompts = calls.filter((c) => c.method === "session.prompt")
-    assert.equal(prompts.length, 2)
+    assert.equal(prompts.length, 3)
   })
 
-  it("first prompt call uses noReply=true", async () => {
+  it("first prompt call injects the system prompt with noReply=true", async () => {
     const { client, calls } = makeMockClient()
     await queryWithSubagent(client, { record: SAMPLE_RECORD, question: "did it work?" }, config)
     const firstPrompt = calls.filter((c) => c.method === "session.prompt")[0]!
-    const body = (firstPrompt.args[0] as { body: { noReply?: boolean } }).body
+    const body = (firstPrompt.args[0] as { body: { noReply?: boolean; parts: Array<{ text: string }> } }).body
     assert.equal(body.noReply, true)
+    assert.ok(body.parts[0]?.text.includes("concise"), "system prompt should mention concise")
   })
 
-  it("context injection prompt contains the command and stdout", async () => {
+  it("second prompt call injects context with noReply=true and contains command and stdout", async () => {
     const { client, calls } = makeMockClient()
     await queryWithSubagent(client, { record: SAMPLE_RECORD, question: "did it work?" }, config)
-    const firstPrompt = calls.filter((c) => c.method === "session.prompt")[0]!
-    const body = (firstPrompt.args[0] as { body: { parts: Array<{ text: string }> } }).body
+    const secondPrompt = calls.filter((c) => c.method === "session.prompt")[1]!
+    const body = (secondPrompt.args[0] as { body: { noReply?: boolean; parts: Array<{ text: string }> } }).body
+    assert.equal(body.noReply, true)
     const text = body.parts[0]?.text ?? ""
     assert.ok(text.includes(SAMPLE_RECORD.command))
     assert.ok(text.includes(SAMPLE_RECORD.stdout))
   })
 
-  it("second prompt contains the question text", async () => {
+  it("third prompt contains the question text", async () => {
     const { client, calls } = makeMockClient()
     const question = "how many tests failed?"
     await queryWithSubagent(client, { record: SAMPLE_RECORD, question }, config)
-    const secondPrompt = calls.filter((c) => c.method === "session.prompt")[1]!
-    const body = (secondPrompt.args[0] as { body: { parts: Array<{ text: string }> } }).body
+    const thirdPrompt = calls.filter((c) => c.method === "session.prompt")[2]!
+    const body = (thirdPrompt.args[0] as { body: { parts: Array<{ text: string }> } }).body
     assert.equal(body.parts[0]?.text, question)
+  })
+
+  it("uses a custom analystSystemPrompt when configured", async () => {
+    const { client, calls } = makeMockClient()
+    const cfg = resolveConfig({ analystSystemPrompt: "CUSTOM SYSTEM PROMPT" })
+    await queryWithSubagent(client, { record: SAMPLE_RECORD, question: "?" }, cfg)
+    const firstPrompt = calls.filter((c) => c.method === "session.prompt")[0]!
+    const body = (firstPrompt.args[0] as { body: { parts: Array<{ text: string }> } }).body
+    assert.equal(body.parts[0]?.text, "CUSTOM SYSTEM PROMPT")
   })
 
   it("returns the answer from text parts", async () => {
@@ -206,8 +217,8 @@ describe("queryWithSubagent", () => {
   it("omits model field when analystModel is not set", async () => {
     const { client, calls } = makeMockClient()
     await queryWithSubagent(client, { record: SAMPLE_RECORD, question: "?" }, resolveConfig())
-    const secondPrompt = calls.filter((c) => c.method === "session.prompt")[1]!
-    const body = secondPrompt.args[0] as { body: { model?: unknown } }
+    const questionPrompt = calls.filter((c) => c.method === "session.prompt")[2]!
+    const body = questionPrompt.args[0] as { body: { model?: unknown } }
     assert.equal(body.body.model, undefined)
   })
 
@@ -215,8 +226,8 @@ describe("queryWithSubagent", () => {
     const { client, calls } = makeMockClient()
     const cfg = resolveConfig({ analystModel: "anthropic/claude-haiku-4-20250514" })
     await queryWithSubagent(client, { record: SAMPLE_RECORD, question: "?" }, cfg)
-    const secondPrompt = calls.filter((c) => c.method === "session.prompt")[1]!
-    const body = secondPrompt.args[0] as { body: { model?: { providerID: string; modelID: string } } }
+    const questionPrompt = calls.filter((c) => c.method === "session.prompt")[2]!
+    const body = questionPrompt.args[0] as { body: { model?: { providerID: string; modelID: string } } }
     assert.deepEqual(body.body.model, {
       providerID: "anthropic",
       modelID: "claude-haiku-4-20250514",
