@@ -1,5 +1,5 @@
-import { tool } from "@opencode-ai/plugin/tool"
-import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { tool } from "@opencode-ai/plugin"
+import type { ToolContext } from "@opencode-ai/plugin"
 import type { SmartBashConfig } from "./config.js"
 import type { ExecutionStore } from "./store.js"
 import type { AnalystClient } from "./analyst.js"
@@ -16,18 +16,11 @@ export interface ShellResult {
 // A shell executor — in production this is Bun's `$`, in tests it's a mock.
 export type ShellExecutor = (command: string) => Promise<ShellResult>
 
-/** Shared response shape returned by both smart bash tools. */
-export interface SmartBashResult {
-  answer: string
-  execution_id: string
-  exit_code: number
-  truncated: boolean
-}
+// Re-export so index.ts can use this type without importing from @opencode-ai/plugin directly.
+export type { ToolContext }
 
-export interface SmartBashQueryResult {
-  answer: string
-  execution_id: string
-}
+// The return type of tool() — what OpenCode expects in the `tool` record.
+export type ToolDefinition = ReturnType<typeof tool>
 
 /**
  * Build and return the `smart_bash` tool.
@@ -41,7 +34,7 @@ export function makeSmartBashTool(
   shell: ShellExecutor,
   store: ExecutionStore,
   config: SmartBashConfig,
-) {
+): ToolDefinition {
   return tool({
     description:
       "Execute a bash command and get a concise, targeted answer about the result " +
@@ -57,12 +50,12 @@ export function makeSmartBashTool(
         .string()
         .describe(
           "What you want to know about the result. " +
-            "Be specific: e.g. \"Did all tests pass?\", " +
-            "\"What errors were reported?\", " +
-            "\"What is the total bundle size?\"",
+          "Be specific: e.g. \"Did all tests pass?\", " +
+          "\"What errors were reported?\", " +
+          "\"What is the total bundle size?\"",
         ),
     },
-    async execute(args, _context: ToolContext): Promise<string> {
+    async execute(args, context: ToolContext): Promise<string> {
       const { command, intent } = args
       const id = crypto.randomUUID()
       const now = Date.now()
@@ -102,7 +95,7 @@ export function makeSmartBashTool(
         config,
       )
 
-      _context.metadata({
+      context.metadata({
         title: `smart_bash: ${command}`,
         metadata: { execution_id: id, exit_code: result.exitCode, truncated },
       })
@@ -122,7 +115,7 @@ export function makeSmartBashQueryTool(
   client: AnalystClient,
   store: ExecutionStore,
   config: SmartBashConfig,
-) {
+): ToolDefinition {
   return tool({
     description:
       "Ask a follow-up question about the output of a previous `smart_bash` " +
@@ -136,10 +129,10 @@ export function makeSmartBashQueryTool(
         .string()
         .describe(
           "Your follow-up question about the stored output. " +
-            "E.g. \"How many tests were skipped?\", \"List the failing file names.\"",
+          "E.g. \"How many tests were skipped?\", \"List the failing file names.\"",
         ),
     },
-    async execute(args, _context: ToolContext): Promise<string> {
+    async execute(args, context: ToolContext): Promise<string> {
       const { execution_id, question } = args
       const record = store.get(execution_id)
 
@@ -155,7 +148,7 @@ export function makeSmartBashQueryTool(
         config,
       )
 
-      _context.metadata({
+      context.metadata({
         title: `smart_bash_query: ${execution_id}`,
         metadata: { execution_id },
       })
@@ -169,7 +162,7 @@ export function makeSmartBashQueryTool(
  * Build the replacement `bash` tool used in "always" mode.
  *
  * Preserves the built-in `bash` interface (only `command` required) so the LLM
- * doesn't need to change its behaviour.  `intent` is optional and falls back to
+ * doesn't need to change its behaviour. `intent` is optional and falls back to
  * `config.defaultIntent`.
  */
 export function makeAlwaysBashTool(
@@ -177,24 +170,27 @@ export function makeAlwaysBashTool(
   shell: ShellExecutor,
   store: ExecutionStore,
   config: SmartBashConfig,
-) {
+): ToolDefinition {
   return tool({
     description:
       "Execute a bash command. Output is automatically summarised by an AI " +
       "sub-agent so large outputs don't fill the context. " +
       "Provide an `intent` to get a targeted answer; omit it for a general summary.",
     args: {
-      command: tool.schema.string().describe("The bash command to execute."),
+      command: tool.schema
+        .string()
+        .describe("The bash command to execute."),
       intent: tool.schema
         .string()
         .optional()
         .describe(
           "Optional: what you want to know about the result. " +
-            "Defaults to a general success/summary check.",
+          "Defaults to a general success/summary check.",
         ),
     },
-    async execute(args, _context: ToolContext): Promise<string> {
-      const { command, intent = config.defaultIntent } = args
+    async execute(args, context: ToolContext): Promise<string> {
+      const { command } = args
+      const intent = args.intent ?? config.defaultIntent
       const id = crypto.randomUUID()
       const now = Date.now()
 
@@ -230,7 +226,7 @@ export function makeAlwaysBashTool(
         config,
       )
 
-      _context.metadata({
+      context.metadata({
         title: `bash: ${command}`,
         metadata: { execution_id: id, exit_code: result.exitCode, truncated },
       })
