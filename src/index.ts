@@ -38,8 +38,6 @@
  *   SMART_BASH_STORE_PATH      path to SQLite DB (default: ~/.local/share/…)
  */
 
-import type { Plugin } from "@opencode-ai/plugin"
-import type { ToolDefinition } from "@opencode-ai/plugin/tool"
 import { resolveConfig } from "./config.js"
 import type { SmartBashConfig } from "./config.js"
 import { ExecutionStore } from "./store.js"
@@ -48,7 +46,26 @@ import {
   makeSmartBashQueryTool,
   makeAlwaysBashTool,
 } from "./tools.js"
+import type { ToolDefinition } from "./tools.js"
 import type { AnalystClient } from "./analyst.js"
+
+/**
+ * Minimal plugin context shape OpenCode passes to the plugin function.
+ * The real ctx also has a Bun shell ($) and other fields — we only type
+ * what we actually use.
+ */
+export interface PluginContext {
+  client: unknown
+  $: (strings: TemplateStringsArray, ...values: unknown[]) => {
+    quiet(): { nothrow(): Promise<{ stdout: Buffer; stderr: Buffer; exitCode: number }> }
+  }
+}
+
+/**
+ * A Plugin is an async function that receives a context and returns a record
+ * of tool definitions keyed by tool name.
+ */
+export type Plugin = (ctx: PluginContext) => Promise<{ tool: Record<string, ToolDefinition> }>
 
 export type { SmartBashConfig, SmartBashMode } from "./config.js"
 export type { ExecutionRecord } from "./store.js"
@@ -73,7 +90,7 @@ export { buildContextBlock, parseModel } from "./analyst.js"
 export function createSmartBashPlugin(
   userConfig?: Partial<SmartBashConfig>,
 ): Plugin {
-  return async (ctx) => {
+  return async (ctx: PluginContext) => {
     const config = resolveConfig(userConfig)
     const store = new ExecutionStore(config.storePath)
 
