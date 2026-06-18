@@ -154,6 +154,9 @@ function configFromEnv(): Partial<SmartBashConfig> {
     if (!isNaN(n) && n > 0) partial.analystTimeoutMs = n
   }
 
+  const systemPrompt = process.env["SMART_BASH_ANALYST_SYSTEM_PROMPT"]
+  if (systemPrompt) partial.analystSystemPrompt = systemPrompt
+
   return partial
 }
 
