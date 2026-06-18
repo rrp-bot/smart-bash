@@ -16,11 +16,10 @@
     "test:watch": "NODE_OPTIONS='--import ./test/register-mocks.mjs' node --experimental-strip-types --experimental-sqlite --import ./test/register-mocks.mjs --test --watch test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
-    "build:bundle": "esbuild src/index.ts --bundle --platform=bun --format=esm --external:node:* --external:bun:* --outfile=dist/smart-bash.js"
+    "build:bundle": "esbuild src/index.ts --bundle --platform=node --format=esm --target=esnext --external:node:* --external:bun:* --external:@opencode-ai/* --outfile=dist/smart-bash.js"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "^1.2.18",
-    "@opencode-ai/sdk": "latest"
+    "@opencode-ai/plugin": "^1.2.18"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",

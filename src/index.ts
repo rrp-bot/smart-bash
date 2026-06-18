@@ -39,7 +39,6 @@
  */
 
 import type { Plugin } from "@opencode-ai/plugin"
-import type { ToolDefinition } from "@opencode-ai/plugin/tool"
 import { resolveConfig } from "./config.js"
 import type { SmartBashConfig } from "./config.js"
 import { ExecutionStore } from "./store.js"
@@ -48,6 +47,7 @@ import {
   makeSmartBashQueryTool,
   makeAlwaysBashTool,
 } from "./tools.js"
+import type { ToolDefinition } from "./tools.js"
 import type { AnalystClient } from "./analyst.js"
 
 export type { SmartBashConfig, SmartBashMode } from "./config.js"
