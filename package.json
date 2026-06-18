@@ -18,7 +18,9 @@
     "build": "tsc",
     "build:bundle": "esbuild src/bundle-entry.ts --bundle --platform=node --format=esm --target=esnext --external:node:* --external:bun:* --outfile=dist/smart-bash.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.2.18"
+  },
   "devDependencies": {
     "esbuild": "^0.25.0",
     "typescript": "^5.0.0"
