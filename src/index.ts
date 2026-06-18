@@ -131,6 +131,12 @@ function configFromEnv(): Partial<SmartBashConfig> {
   const storePath = process.env["SMART_BASH_STORE_PATH"]
   if (storePath) partial.storePath = storePath
 
+  const timeoutMs = process.env["SMART_BASH_ANALYST_TIMEOUT_MS"]
+  if (timeoutMs) {
+    const n = parseInt(timeoutMs, 10)
+    if (!isNaN(n) && n > 0) partial.analystTimeoutMs = n
+  }
+
   return partial
 }
 
